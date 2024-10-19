@@ -1,0 +1,902 @@
+
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load the dataset
+
+
+
+
+import numpy as np
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report
+
+
+df_train = pd.read_csv('/content/drive/MyDrive/Colab Notebooks/CT22_english_1C_harmful_train.csv')
+df_test = pd.read_csv('/content/drive/MyDrive/Colab Notebooks/CT22_english_1C_harmful_dev_test.csv')
+
+df_train.head()
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+X_train =df_train["tweet_text"].values
+y_train =df_train["class_label"].values
+#y_train = df_train['target']
+#y_test = df_test['target']
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+from sklearn.feature_extraction.text import CountVectorizer
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Text preprocessing steps
+nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('wordnet')
+
+stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
+
+def preprocess_text(text):
+    # Clean the text
+    text = text.lower()  # Convert to lowercase
+    # Add text cleaning steps here
+
+    # Tokenize the text
+    tokens = word_tokenize(text)
+
+    # Remove stop words
+    tokens = [token for token in tokens if token not in stop_words]
+
+    # Lemmatize the tokens
+    tokens = [lemmatizer.lemmatize(token) for token in tokens]
+
+    # Join the tokens back into a single string
+    preprocessed_text = ' '.join(tokens)
+
+    return preprocessed_text
+
+# Preprocess the training data
+X_train_preprocessed = [preprocess_text(text) for text in df_train['tweet_text']]
+y_train = df_train['class_label']
+
+# Preprocess the test data
+X_test_preprocessed = [preprocess_text(text) for text in df_test['tweet_text']]
+y_test = df_test['class_label']
+
+# Convert preprocessed text to numerical vectors
+vectorizer = CountVectorizer()
+X_train_vectorized = vectorizer.fit_transform(X_train_preprocessed)
+X_test_vectorized = vectorizer.transform(X_test_preprocessed)
+
+# Initialize the logistic regression model
+logistic_model = LogisticRegression(penalty='l2', C=1.0, solver='lbfgs', max_iter=100)
+
+# Fit the logistic regression model on the training data
+logistic_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred = logistic_model.predict(X_test_vectorized)
+import os
+#prediction_results = model.predict(X_test)
+
+# Step 4: Choose directory path
+
+# Step 4: Choose directory path
+save_path = '/content/drive/MyDrive/Colab Notebooks/HarmfulTextDetec/'
+os.makedirs(save_path, exist_ok=True)
+
+# Step 5: Open text file
+with open(save_path + 'prediction_results_LRtUdate.txt', 'w') as file:
+    # Step 6: Write column name
+    file.write('label\n')
+
+    # Step 7: Write prediction results
+    for result in y_pred:
+        file.write(str(result) + '\n')
+
+# Calculate the classification report
+report = classification_report(y_test, y_pred)
+
+# Print the classification report
+print(report)
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+results = confusion_matrix(y_test, y_pred)
+
+sns.heatmap(results/np.sum(results), annot=True, fmt='.2%', cmap="YlGnBu",xticklabels=["Not-Harmful", "Harmful"], yticklabels=["Not-Harmful", "Harmful"])
+
+print('Confusion Matrix:')
+
+
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report
+from sklearn.feature_extraction.text import CountVectorizer
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Text preprocessing steps
+nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('wordnet')
+
+stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
+
+def preprocess_text(text):
+    # Clean the text
+    text = text.lower()  # Convert to lowercase
+    # Add text cleaning steps here
+
+    # Tokenize the text
+    tokens = word_tokenize(text)
+
+    # Remove stop words
+    tokens = [token for token in tokens if token not in stop_words]
+
+    # Lemmatize the tokens
+    tokens = [lemmatizer.lemmatize(token) for token in tokens]
+
+    # Join the tokens back into a single string
+    preprocessed_text = ' '.join(tokens)
+
+    return preprocessed_text
+
+# Preprocess the training data
+X_train_preprocessed = [preprocess_text(text) for text in df_train['tweet_text']]
+y_train = df_train['class_label']
+
+# Preprocess the test data
+X_test_preprocessed = [preprocess_text(text) for text in df_test['tweet_text']]
+y_test = df_test['class_label']
+
+# Convert preprocessed text to numerical vectors
+vectorizer = CountVectorizer()
+X_train_vectorized = vectorizer.fit_transform(X_train_preprocessed)
+X_test_vectorized = vectorizer.transform(X_test_preprocessed)
+
+# Initialize the SVM model
+svm_model = SVC()
+
+# Fit the SVM model on the training data
+svm_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred2 = svm_model.predict(X_test_vectorized)
+
+# Calculate the classification report
+report = classification_report(y_test, y_pred2)
+
+# Print the classification report
+print(report)
+import os
+
+# Step 4: Choose directory path
+save_path = '/content/drive/MyDrive/Colab Notebooks/HarmfulTextDetec/'
+os.makedirs(save_path, exist_ok=True)
+
+# Step 5: Open text file
+with open(save_path + 'prediction_results_SVMUdate.txt', 'w') as file:
+    # Step 6: Write column name
+    file.write('label\n')
+
+    # Step 7: Write prediction results
+    for result in y_pred2:
+        file.write(str(result) + '\n')
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+results = confusion_matrix(y_test, y_pred2)
+
+sns.heatmap(results/np.sum(results), annot=True, fmt='.2%', cmap="PuBu",xticklabels=["Not-Harmful", "Harmful"], yticklabels=["Not-Harmful", "Harmful"])
+
+print('Confusion Matrix:')
+
+
+
+
+
+from sklearn.ensemble import RandomForestClassifier
+
+
+
+# Initialize the Random Forest model
+rf_model = RandomForestClassifier()
+
+
+# Fit the Random Forest model on the training data
+rf_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred3 = rf_model.predict(X_test_vectorized)
+
+# Calculate the classification report
+report = classification_report(y_test, y_pred)
+
+# Print the classification report
+print(report)
+import os
+
+# Step 4: Choose directory path
+save_path = '/content/drive/MyDrive/Colab Notebooks/HarmfulTextDetec/'
+os.makedirs(save_path, exist_ok=True)
+
+# Step 5: Open text file
+with open(save_path + 'prediction_results_RFupdate.txt', 'w') as file:
+    # Step 6: Write column name
+    file.write('label\n')
+
+    # Step 7: Write prediction results
+    for result in y_pred3:
+        file.write(str(result) + '\n')
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+results = confusion_matrix(y_test, y_pred2)
+
+sns.heatmap(results/np.sum(results), annot=True, fmt='.2%', cmap="PuBuGn",xticklabels=["Not-Harmful", "Harmful"], yticklabels=["Not-Harmful", "Harmful"])
+
+print('Confusion Matrix:')
+
+from sklearn.tree import DecisionTreeClassifier
+dt_model = DecisionTreeClassifier(criterion='gini', max_depth=10, min_samples_split=2)
+
+# Fit the Decision Tree Classifier on the training data
+dt_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred4 = dt_model.predict(X_test_vectorized)
+
+# Calculate the classification report
+report = classification_report(y_test, y_pred)
+
+# Print the classification report
+print(report)
+
+import os
+
+# Step 4: Choose directory path
+save_path = '/content/drive/MyDrive/Colab Notebooks/HarmfulTextDetec/'
+os.makedirs(save_path, exist_ok=True)
+
+# Step 5: Open text file
+with open(save_path + 'prediction_results_DTupdate.txt', 'w') as file:
+    # Step 6: Write column name
+    file.write('label\n')
+
+    # Step 7: Write prediction results
+    for result in y_pred4:
+        file.write(str(result) + '\n')
+        file.write(str(result) + '\n')
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+results = confusion_matrix(y_test, y_pred)
+
+sns.heatmap(results/np.sum(results), annot=True, fmt='.2%', cmap="YlGn",xticklabels=["Not-Harmful", "Harmful"], yticklabels=["Not-Harmful", "Harmful"])
+
+print('Confusion Matrix:')
+
+
+
+import os
+#prediction_results = model.predict(X_test)
+
+# Step 4: Choose directory path
+save_path = '/content/drive/MyDrive/Colab Notebooks/HarmfulTextDetec/'
+os.makedirs(save_path, exist_ok=True)
+# Step 5: Open text file
+with open(save_path + 'prediction_results_SVC.txt', 'w') as file:
+    # Step 6: Write prediction results
+    for result in y_pred3:
+        file.write(str(result) + '\n')
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+
+# Initialize and fit the logistic regression model
+logreg_model = LogisticRegression(penalty='l2', C=1.0, solver='lbfgs', max_iter=100)
+logreg_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred_proba = logreg_model.predict_proba(X_test_vectorized)[:, 1]
+
+# Calculate the AUC
+auc = roc_auc_score(y_test, y_pred_proba)
+
+# Calculate the ROC curve
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+
+# Plot the ROC curve
+plt.plot(fpr, tpr, label='ROC curve (AUC = {:.2f})'.format(auc))
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Random')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend()
+plt.show()
+
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+
+# Initialize and fit the logistic regression model
+logreg_model = LogisticRegression()
+logreg_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred_proba = logreg_model.predict_proba(X_test_vectorized)[:, 1]
+
+# Calculate the AUC
+auc = roc_auc_score(y_test, y_pred_proba)
+
+# Calculate the ROC curve
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+
+# Plot the ROC curve
+plt.plot(fpr, tpr, label='{} (AUC = {:.2f})'.format('Logistic Regression', auc))
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Random')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend()
+plt.show()
+
+
+from sklearn.svm import SVC
+from sklearn.metrics import roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+
+# Initialize and fit the SVM model
+svm_model = SVC(C=1.0, kernel='rbf', gamma='scale')
+svm_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred_proba = svm_model.decision_function(X_test_vectorized)
+
+# Calculate the AUC
+auc = roc_auc_score(y_test, y_pred_proba)
+
+# Calculate the ROC curve
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+
+# Plot the ROC curve
+plt.plot(fpr, tpr, color='orange', label='SVM (AUC = {:.2f})'.format(auc))
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Random')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend()
+plt.show()
+
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+
+# Initialize and fit the Random Forest model
+rf_model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=42)
+rf_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred_proba = rf_model.predict_proba(X_test_vectorized)[:, 1]
+
+# Calculate the AUC
+auc = roc_auc_score(y_test, y_pred_proba)
+
+# Calculate the ROC curve
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+
+# Plot the ROC curve
+plt.plot(fpr, tpr, color='red', label='Random Forest (AUC = {:.2f})'.format(auc))
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Random')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend()
+plt.show()
+
+
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+
+# Initialize and fit the Decision Tree Classifier
+dt_model = DecisionTreeClassifier(max_depth=5, random_state=42)
+dt_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data
+y_pred_proba = dt_model.predict_proba(X_test_vectorized)[:, 1]
+
+# Calculate the AUC
+auc = roc_auc_score(y_test, y_pred_proba)
+
+# Calculate the ROC curve
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+
+# Plot the ROC curve with green color
+plt.plot(fpr, tpr, color='green', label='Decision Tree (AUC = {:.2f})'.format(auc))
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Random')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend()
+plt.show()
+
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+
+# Logistic Regression
+logreg_model = LogisticRegression(penalty='l2', C=1.0, solver='lbfgs', max_iter=100)
+logreg_model.fit(X_train_vectorized, y_train)
+logreg_proba = logreg_model.predict_proba(X_test_vectorized)[:, 1]
+logreg_auc = roc_auc_score(y_test, logreg_proba)
+logreg_fpr, logreg_tpr, _ = roc_curve(y_test, logreg_proba)
+
+# SVM
+svm_model = SVC(C=1.0, kernel='rbf', gamma='scale', probability=True)
+svm_model.fit(X_train_vectorized, y_train)
+svm_proba = svm_model.predict_proba(X_test_vectorized)[:, 1]
+svm_auc = roc_auc_score(y_test, svm_proba)
+svm_fpr, svm_tpr, _ = roc_curve(y_test, svm_proba)
+
+# Random Forest
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_model.fit(X_train_vectorized, y_train)
+rf_proba = rf_model.predict_proba(X_test_vectorized)[:, 1]
+rf_auc = roc_auc_score(y_test, rf_proba)
+rf_fpr, rf_tpr, _ = roc_curve(y_test, rf_proba)
+
+# Decision Tree
+dt_model = DecisionTreeClassifier(max_depth=5, random_state=42)
+dt_model.fit(X_train_vectorized, y_train)
+dt_proba = dt_model.predict_proba(X_test_vectorized)[:, 1]
+dt_auc = roc_auc_score(y_test, dt_proba)
+dt_fpr, dt_tpr, _ = roc_curve(y_test, dt_proba)
+
+# Plotting the AUC curves
+plt.plot(logreg_fpr, logreg_tpr, label='Logistic Regression (AUC = {:.2f})'.format(logreg_auc))
+plt.plot(svm_fpr, svm_tpr, label='SVM (AUC = {:.2f})'.format(svm_auc))
+plt.plot(rf_fpr, rf_tpr, label='Random Forest (AUC = {:.2f})'.format(rf_auc))
+plt.plot(dt_fpr, dt_tpr, label='Decision Tree (AUC = {:.2f})'.format(dt_auc))
+
+# Plotting the random curve
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Random')
+
+# Customize the plot
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend()
+
+# Display the plot
+plt.show()
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the metrics for each model
+models = ['Logistic Regression', 'SVM', 'Random Forest', 'Decision Tree']
+accuracy = [0.91, 0.91, 0.91, 0.91]
+f1_score = [0.18, 0.02, 0.07, 0.07]
+recall = [0.11, 0.01, 0.04, 0.04]
+
+# Set the width of the bars
+bar_width = 0.25
+
+# Set the positions of the bars on the x-axis
+r1 = np.arange(len(accuracy))
+r2 = [x + bar_width for x in r1]
+r3 = [x + bar_width for x in r2]
+
+# Create the bar chart
+plt.bar(r1, accuracy, color='blue', width=bar_width, edgecolor='black', label='Accuracy')
+plt.bar(r2, f1_score, color='green', width=bar_width, edgecolor='black', label='F1 Score')
+plt.bar(r3, recall, color='orange', width=bar_width, edgecolor='black', label='Recall')
+
+# Add x-axis labels
+plt.xlabel('Models', fontweight='bold')
+plt.xticks([r + bar_width for r in range(len(accuracy))], models)
+
+# Add y-axis label
+plt.ylabel('Score', fontweight='bold')
+
+# Add a title
+plt.title('Model Performance Comparison')
+
+# Add a legend
+plt.legend()
+
+# Display the plot
+plt.show()
+
+
+from sklearn.ensemble import VotingClassifier
+from sklearn.metrics import classification_report
+
+# Assuming you have already trained and obtained individual models: svm_model, logreg_model, dt_model, rf_model
+
+# Create an ensemble model using VotingClassifier
+ensemble_model = VotingClassifier(estimators=[
+    ('SVM', svm_model),
+    ('Logistic Regression', logreg_model),
+    ('Decision Tree', dt_model),
+    ('Random Forest', rf_model)
+], voting='hard')
+
+# Fit the ensemble model on the training data
+ensemble_model.fit(X_train_vectorized, y_train)
+
+# Make predictions on the test data using the ensemble model
+y_pred = ensemble_model.predict(X_test_vectorized)
+
+# Print the classification report for the ensemble model
+report = classification_report(y_test, y_pred)
+print(report)
+
+
+import matplotlib.pyplot as plt
+
+# Define the data points for the x-axis
+x_axis_values = [1, 2, 3, 4, 5]
+
+# Define the performance metrics for each model
+models = ['Logistic Regression', 'SVM', 'Random Forest', 'Decision Tree']
+accuracy = [0.85, 0.82, 0.87, 0.79]
+f1_score = [0.86, 0.80, 0.88, 0.75]
+recall = [0.82, 0.85, 0.89, 0.76]
+
+# Create a figure and axis
+fig, ax = plt.subplots()
+
+# Plot the performance metrics for each model using a line chart
+for model_name, metrics in performance_metrics.items():
+    ax.plot(x_axis_values, metrics, label=model)
+
+# Customize the chart
+ax.set_xlabel('Data Points')
+ax.set_ylabel('Performance Metric')
+ax.set_title('Comparative Analysis of Performance Metrics')
+
+ax.legend()
+
+plt.show()
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define the performance metrics for each model
+performance_metrics = {
+    'Model A': [0.8, 0.6, 0.7, 0.9, 0.5],
+    'Model B': [0.6, 0.5, 0.4, 0.8, 0.7],
+    'Model C': [0.9, 0.7, 0.6, 0.8, 0.9]
+}
+
+# Create a DataFrame using the performance metrics
+df = pd.DataFrame(performance_metrics)
+
+# Create a violin plot using seaborn
+sns.violinplot(data=df)
+
+# Customize the plot
+plt.xlabel('Models')
+plt.ylabel('Performance Metric')
+plt.title('Comparative Analysis of Performance Metrics')
+
+plt.show()
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Define the performance metrics for each model
+performance_metrics = {
+    'SVM': [.91, .02, .01, 1.00],
+    'Logistic Regression': [.91, .18, .11, .53],
+    'Decision Tree': [0.91,.07 , 0.04, 1.00],
+    'Random Forest': [0.91,.07 , 0.04, 1.00]
+}
+
+# Define the performance metric names
+metric_names = ['Accuracy', 'F1 Score', 'Recall', 'Precision']
+
+# Create a DataFrame using the performance metrics
+df = pd.DataFrame(performance_metrics, index=metric_names)
+
+# Create a heatmap using seaborn
+sns.heatmap(df, annot=True, cmap='YlGnBu')
+
+# Customize the plot
+plt.xlabel('Models')
+plt.ylabel('Performance Metrics')
+plt.title('Comparative Analysis of Performance Metrics')
+
+plt.show()
+
+
+import matplotlib.pyplot as plt
+
+# Define the performance metrics for each model
+accuracy = [0.8, 0.6, 0.7, 0.9]
+f1_score = [0.6, 0.5, 0.4, 0.8]
+recall = [0.9, 0.7, 0.6, 0.8]
+precision = [0.7, 0.8, 0.9, 0.6]
+roc_auc = [0.5, 0.6, 0.7, 0.8]
+
+# Define the model names
+model_names = ['SVM', 'Logistic Regression', 'Decision Tree', 'Random Forest']
+
+# Create a scatter plot
+plt.scatter(accuracy, f1_score, label='Accuracy vs F1 Score', color='red')
+plt.scatter(recall, precision, label='Recall vs Precision', color='blue')
+plt.scatter(roc_auc, f1_score, label='ROC AUC vs F1 Score', color='green')
+
+# Add labels and a legend
+plt.xlabel('Performance Metric')
+plt.ylabel('Performance Metric')
+plt.title('Comparative Analysis of Performance Metrics')
+plt.legend()
+
+# Add data point labels
+for i, model_name in enumerate(model_names):
+    plt.annotate(model_name, (accuracy[i], f1_score[i]))
+
+plt.show()
+
+
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
+# Assuming you have a list of texts in your training dataset
+texts = df_train['tweet_text'].tolist()
+
+# Combine the texts into a single string
+combined_text = ' '.join(texts)
+
+# Create a WordCloud object with circle shape
+wordcloud = WordCloud(background_color='white', shape='circle').generate(combined_text)
+
+# Display the word cloud
+plt.figure(figsize=(8, 8))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.show()
+
+
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+
+# Assuming you have a list of texts in your training dataset
+texts = df_train['tweet_text'].tolist()
+
+# Combine the texts into a single string
+combined_text = ' '.join(texts)
+
+# Create a WordCloud object
+wordcloud = WordCloud(background_color='white').generate(combined_text)
+
+# Create a circular mask
+mask = np.array(Image.open('circle_mask.png'))  # Replace 'circle_mask.png' with your circular mask image
+
+# Apply the circular mask to the word cloud
+wordcloud = WordCloud(background_color='white', mask=mask).generate(combined_text)
+
+# Display the word cloud
+plt.figure(figsize=(8, 8))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.show()
+
+
+from sklearn.ensemble import VotingClassifier
+from sklearn.model_selection import train_test_split, GridSearchCV
+
+seed = None
+#X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.3, random_state= 20)
+#X_train = tfidf.fit_transform(X_train)
+#X_test = tfidf.transform(X_test)
+kfold = model_selection.KFold(n_splits=10, random_state=seed)
+
+estimators = []
+model1 = LogisticRegression(penalty='l2', C=1.0, solver='lbfgs', max_iter=100); estimators.append(("logistic", model1))
+model2 = DecisionTreeClassifier(criterion='gini', max_depth=10, min_samples_split=2); estimators.append(("cart", model2))
+model3 = SVC(); estimators.append(("svm", model3))
+model4= RandomForestClassifier(n_estimators=100, criterion='gini', max_depth=10, min_samples_split=2);estimators.append(("RFC", model4))
+ensemble = VotingClassifier(estimators)
+#results = model_selection.cross_val_score(ensemble, X_train, y_train, cv=kfold)
+print(results.mean())
+
+class_counts = df_train['class_label'].value_counts()
+plt.bar(class_counts.index, class_counts.values)
+plt.xlabel('Class Label')
+plt.ylabel('Count')
+plt.title('Distribution of Class Labels')
+plt.show()
+
+
+
+
+
+
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Assuming you have loaded the dataset into a DataFrame called 'df'
+# Calculate the length of each tweet_text
+df_train['tweet_text_length'] = df_train['tweet_text'].apply(len)
+
+# Plot the histogram
+plt.hist(df_train['tweet_text_length'], bins=20)
+
+# Set the labels and title
+plt.xlabel('Tweet Text Length')
+plt.ylabel('Frequency')
+plt.title('Distribution of Tweet Text Length')
+
+# Show the plot
+plt.show()
+
+
+import pandas as pd
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
+# Assuming you have loaded the dataset into a DataFrame called 'df'
+# Concatenate all the tweet_text into a single string
+text = ' '.join(df_train['tweet_text'])
+
+# Create the word cloud
+wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+
+# Plot the word cloud
+plt.figure(figsize=(8, 6))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.title('Word Cloud - Most Frequent Words in Tweet Text')
+
+# Show the plot
+plt.show()
+
+
+import pandas as pd
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
+# Assuming you have loaded the dataset into a DataFrame called 'df'
+# Concatenate all the tweet_text into a single string
+text = ' '.join(df_train['tweet_text'])
+
+# Create the word cloud with circular shape
+wordcloud = WordCloud(width=800, height=800, background_color='white', prefer_horizontal=0.9).generate(text)
+
+# Plot the word cloud in circular shape
+plt.figure(figsize=(8, 8))
+plt.imshow(wordcloud, interpolation='bilinear')
+plt.axis('off')
+plt.title('Word Cloud - Most Frequent Words in Tweet Text')
+
+# Show the plot
+plt.show()
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Assuming your dataset is stored in a DataFrame called 'df'
+tweet_lengths = df_train['tweet_text'].apply(len)
+df_train['tweet_length'] = tweet_lengths
+
+sns.scatterplot(x='tweet_length', y='class_label', data=df_train, hue='class_label', palette='Set1')
+plt.xlabel('Tweet Length')
+plt.ylabel('Class Label')
+plt.title('Correlation between Tweet Length and Class Label')
+plt.show()
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Assuming your dataset is stored in a DataFrame called 'df'
+sns.boxplot(x='class_label', y='tweet_length', data=df_train)
+plt.xlabel('Class Label')
+plt.ylabel('Tweet Length')
+plt.title('Correlation between Tweet Length and Class Label')
+plt.show()
+
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the epochs
+epochs = [1, 3, 5, 7, 9]
+
+# Define the performance metrics for each epoch
+accuracy = [0.64, 0.91, 0.91, 0.91, 0.91]
+f1_score = [0.16, 0.04, 0.17, 0.02, 0.02]
+recall = [0.38, 0.02, 0.18, 0.01, 0.01]
+precision = [0.10, 0.25, 0.16, 0.50, 0.50]
+
+# Plot the lines for each metric
+plt.plot(epochs, accuracy, marker='o', linestyle='-', color='blue', label='Accuracy')
+plt.plot(epochs, f1_score, marker='o', linestyle='-', color='green', label='F1 Score')
+plt.plot(epochs, recall, marker='o', linestyle='-', color='orange', label='Recall')
+plt.plot(epochs, precision, marker='o', linestyle='-', color='red', label='Precision')
+
+# Add x-axis and y-axis labels
+plt.xlabel('Epochs')
+plt.ylabel('Score')
+
+# Add a title
+plt.title('Performance Metrics over Epochs')
+
+# Add a legend
+plt.legend()
+
+# Show the plot
+plt.show()
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Define the epochs
+epochs = [3, 6, 9, 12, 15]
+
+# Define the performance metrics for each epoch
+accuracy = [0.91, 0.90, 0.91, 0.91, 0.91]
+f1_score = [0.22, 0.38, 0.42, 0.42, 0.42]
+recall = [0.15, 0.35, 0.38, 0.38, 0.38]
+precision = [0.48, 0.42, 0.48, 0.48, 0.48]
+
+# Plot the lines for each metric
+plt.plot(epochs, accuracy, marker='o', linestyle='-', color='blue', label='Accuracy')
+plt.plot(epochs, f1_score, marker='o', linestyle='-', color='green', label='F1 Score')
+plt.plot(epochs, recall, marker='o', linestyle='-', color='orange', label='Recall')
+plt.plot(epochs, precision, marker='o', linestyle='-', color='red', label='Precision')
+
+# Add x-axis and y-axis labels
+plt.xlabel('Epochs')
+plt.ylabel('Score')
+
+# Add a title
+plt.title('Performance Metrics over Epochs')
+
+# Add a legend
+plt.legend()
+
+# Show the plot
+plt.show()
+
+
