@@ -1,0 +1,488 @@
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load the dataset
+df_train = pd.read_csv('/content/drive/MyDrive/FinalDataset/CT22_english_1C_harmful_train.csv')
+df_test = pd.read_csv('/content/drive/MyDrive/Colab Notebooks/CT22_english_1C_harmful_dev_test.csv')
+
+df_train.head()
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+import torchvision.transforms as transforms
+import numpy as np
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report, roc_auc_score, roc_curve, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Load the dataset
+#df_train = pd.read_csv('/mnt/data/Book1.csv')
+#df_test = pd.read_csv('/mnt/data/Book1.csv')
+
+# Vectorize text using TF-IDF
+vectorizer = TfidfVectorizer(max_features=1000)
+X_train = vectorizer.fit_transform(df_train['tweet_text']).toarray()
+X_test = vectorizer.transform(df_test['tweet_text']).toarray()
+
+y_train = df_train['class_label'].values
+y_test = df_test['class_label'].values
+
+# Convert to PyTorch tensors
+X_train = torch.tensor(X_train, dtype=torch.float32)
+y_train = torch.tensor(y_train, dtype=torch.long)
+X_test = torch.tensor(X_test, dtype=torch.float32)
+y_test = torch.tensor(y_test, dtype=torch.long)
+
+# Create custom dataset class
+class TextDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+
+# Create DataLoaders
+train_loader = DataLoader(TextDataset(X_train, y_train), batch_size=32, shuffle=True)
+test_loader = DataLoader(TextDataset(X_test, y_test), batch_size=32, shuffle=False)
+
+# Define the FixMatch model (Simple Feedforward NN)
+class FixMatchModel(nn.Module):
+    def __init__(self, input_size, num_classes=2):
+        super(FixMatchModel, self).__init__()
+        self.fc1 = nn.Linear(input_size, 128)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(128, num_classes)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        return x
+
+# Initialize the model, loss function, and optimizer
+model = FixMatchModel(input_size=X_train.shape[1])
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Augmentation strategies (Weak & Strong)
+def weak_augmentation(x):
+    return x + torch.randn_like(x) * 0.01  # Weak noise
+
+def strong_augmentation(x):
+    return x + torch.randn_like(x) * 0.1  # Stronger noise
+
+# Training loop with FixMatch logic
+def train_fixmatch(model, train_loader, optimizer, criterion, threshold=0.95, epochs=5):
+    model.train()
+    for epoch in range(epochs):
+        total_loss = 0
+        for X_batch, y_batch in train_loader:
+            # Apply weak augmentation
+            weak_X = weak_augmentation(X_batch)
+            with torch.no_grad():
+                logits = model(weak_X)
+                pseudo_labels = torch.argmax(logits, dim=1)
+
+            # Apply strong augmentation
+            strong_X = strong_augmentation(X_batch)
+
+            # Forward pass with strong augmentation
+            outputs = model(strong_X)
+
+            # Filter by confidence threshold
+            mask = torch.max(torch.softmax(logits, dim=1), dim=1)[0] >= threshold
+            loss = criterion(outputs[mask], pseudo_labels[mask])
+
+            # Backpropagation
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+
+        print(f"Epoch {epoch + 1}, Loss: {total_loss / len(train_loader)}")
+
+# Train the FixMatch model
+train_fixmatch(model, train_loader, optimizer, criterion)
+
+# Evaluate the model on test data
+model.eval()
+y_pred = []
+y_pred_proba = []
+with torch.no_grad():
+    for X_batch, _ in test_loader:
+        outputs = model(X_batch)
+        probabilities = torch.softmax(outputs, dim=1)
+        y_pred_proba.extend(probabilities[:, 1].numpy())
+        y_pred.extend(torch.argmax(probabilities, dim=1).numpy())
+
+# Calculate metrics
+print("Classification Report:")
+print(classification_report(y_test, y_pred))
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.show()
+
+# ROC Curve
+fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+auc = roc_auc_score(y_test, y_pred_proba)
+
+plt.plot(fpr, tpr, color='red', label=f'AUC = {auc:.2f}')
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend()
+plt.show()
+
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+import torchvision.transforms as transforms
+import numpy as np
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+# Vectorize text using TF-IDF
+vectorizer = TfidfVectorizer(max_features=1000)
+X_train = vectorizer.fit_transform(df_train['tweet_text']).toarray()
+X_test = vectorizer.transform(df_test['tweet_text']).toarray()
+
+y_train = df_train['class_label'].values
+y_test = df_test['class_label'].values
+
+# Convert to PyTorch tensors
+X_train = torch.tensor(X_train, dtype=torch.float32)
+y_train = torch.tensor(y_train, dtype=torch.long)
+X_test = torch.tensor(X_test, dtype=torch.float32)
+y_test = torch.tensor(y_test, dtype=torch.long)
+
+# Create custom dataset class
+class TextDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+
+# Create DataLoaders
+train_loader = DataLoader(TextDataset(X_train, y_train), batch_size=32, shuffle=True)
+test_loader = DataLoader(TextDataset(X_test, y_test), batch_size=32, shuffle=False)
+
+# Define the FixMatch model (Simple Feedforward NN)
+class FixMatchModel(nn.Module):
+    def __init__(self, input_size, num_classes=2):
+        super(FixMatchModel, self).__init__()
+        self.fc1 = nn.Linear(input_size, 128)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(128, num_classes)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        return x
+
+# Initialize the model, loss function, and optimizer
+model = FixMatchModel(input_size=X_train.shape[1])
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Augmentation strategies (Weak & Strong)
+def weak_augmentation(x):
+    return x + torch.randn_like(x) * 0.01  # Weak noise
+
+def strong_augmentation(x):
+    return x + torch.randn_like(x) * 0.1  # Stronger noise
+
+# Training loop with FixMatch logic
+def train_fixmatch(model, train_loader, optimizer, criterion, threshold=0.95, epochs=5):
+    model.train()
+    for epoch in range(epochs):
+        total_loss = 0
+        for X_batch, y_batch in train_loader:
+            # Apply weak augmentation
+            weak_X = weak_augmentation(X_batch)
+            with torch.no_grad():
+                logits = model(weak_X)
+                pseudo_labels = torch.argmax(logits, dim=1)
+
+            # Apply strong augmentation
+            strong_X = strong_augmentation(X_batch)
+
+            # Forward pass with strong augmentation
+            outputs = model(strong_X)
+
+            # Filter by confidence threshold
+            mask = torch.max(torch.softmax(logits, dim=1), dim=1)[0] >= threshold
+            loss = criterion(outputs[mask], pseudo_labels[mask])
+
+            # Backpropagation
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+
+        print(f"Epoch {epoch + 1}, Loss: {total_loss / len(train_loader)}")
+
+# Train the FixMatch model
+train_fixmatch(model, train_loader, optimizer, criterion)
+
+# Evaluate the model on test data
+model.eval()
+y_pred = []
+y_pred_proba = []
+with torch.no_grad():
+    for X_batch, _ in test_loader:
+        outputs = model(X_batch)
+        probabilities = torch.softmax(outputs, dim=1)
+        y_pred_proba.extend(probabilities[:, 1].numpy())
+        y_pred.extend(torch.argmax(probabilities, dim=1).numpy())
+
+# Calculate classification metrics
+report = classification_report(y_test, y_pred, output_dict=True)
+
+# Print precision, recall, and F1-score for both classes
+print(f"\nClass 0 - Precision: {report['0']['precision']:.2f}, Recall: {report['0']['recall']:.2f}, F1-score: {report['0']['f1-score']:.2f}")
+print(f"Class 1 - Precision: {report['1']['precision']:.2f}, Recall: {report['1']['recall']:.2f}, F1-score: {report['1']['f1-score']:.2f}")
+
+# Print confusion matrix
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.show()
+
+# Calculate ROC curve and AUC
+fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
+auc = roc_auc_score(y_test, y_pred_proba)
+
+# Plot ROC curve
+plt.plot(fpr, tpr, color='red', label=f'AUC = {auc:.2f}')
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend()
+plt.show()
+
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+
+# Vectorize the text using TF-IDF
+vectorizer = TfidfVectorizer(max_features=1000)
+X_train = vectorizer.fit_transform(df_train['tweet_text']).toarray()
+X_test = vectorizer.transform(df_test['tweet_text']).toarray()
+
+y_train = df_train['class_label'].values
+y_test = df_test['class_label'].values
+
+# Convert to PyTorch tensors
+X_train = torch.tensor(X_train, dtype=torch.float32)
+y_train = torch.tensor(y_train, dtype=torch.long)
+X_test = torch.tensor(X_test, dtype=torch.float32)
+y_test = torch.tensor(y_test, dtype=torch.long)
+
+# Create custom dataset
+class TextDataset(Dataset):
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+
+    def __len__(self):
+        return len(self.y)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+
+# DataLoaders
+train_loader = DataLoader(TextDataset(X_train, y_train), batch_size=32, shuffle=True)
+
+# Define Generator
+class Generator(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(Generator, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        return x
+
+# Define Discriminator
+class Discriminator(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(Discriminator, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        return self.sigmoid(x)
+
+# Initialize Generator and Discriminator
+generator = Generator(input_size=100, hidden_size=128, output_size=X_train.shape[1])
+discriminator = Discriminator(input_size=X_train.shape[1], hidden_size=128)
+
+# Loss and optimizers
+criterion = nn.BCELoss()
+optimizer_g = optim.Adam(generator.parameters(), lr=0.001)
+optimizer_d = optim.Adam(discriminator.parameters(), lr=0.001)
+
+# Training GAN
+def train_gan(generator, discriminator, train_loader, epochs=10):
+    for epoch in range(epochs):
+        for X_real, _ in train_loader:
+            # Train Discriminator
+            optimizer_d.zero_grad()
+            real_labels = torch.ones(X_real.size(0), 1)
+            fake_labels = torch.zeros(X_real.size(0), 1)
+
+            outputs_real = discriminator(X_real)
+            loss_real = criterion(outputs_real, real_labels)
+
+            noise = torch.randn(X_real.size(0), 100)
+            fake_data = generator(noise)
+            outputs_fake = discriminator(fake_data.detach())
+            loss_fake = criterion(outputs_fake, fake_labels)
+
+            loss_d = loss_real + loss_fake
+            loss_d.backward()
+            optimizer_d.step()
+
+            # Train Generator
+            optimizer_g.zero_grad()
+            outputs_fake = discriminator(fake_data)
+            loss_g = criterion(outputs_fake, real_labels)  # Trick discriminator
+            loss_g.backward()
+            optimizer_g.step()
+
+        print(f"Epoch [{epoch+1}/{epochs}], Loss D: {loss_d.item():.4f}, Loss G: {loss_g.item():.4f}")
+
+# Train the GAN
+train_gan(generator, discriminator, train_loader)
+
+# Generate synthetic data for evaluation
+def generate_synthetic_data(generator, num_samples=100):
+    noise = torch.randn(num_samples, 100)
+    synthetic_data = generator(noise).detach().numpy()
+    return synthetic_data
+
+# Generate synthetic samples and evaluate the classifier
+X_synthetic = generate_synthetic_data(generator, num_samples=500)
+y_synthetic = np.zeros(500)  # Fake samples labeled as class 0
+
+# Combine real and synthetic data for evaluation
+X_combined = np.vstack((X_test, X_synthetic))
+y_combined = np.hstack((y_test, y_synthetic))
+
+# Evaluate using the Discriminator
+y_pred_proba = discriminator(torch.tensor(X_combined, dtype=torch.float32)).detach().numpy()
+y_pred = (y_pred_proba > 0.5).astype(int)
+
+# Classification report
+report = classification_report(y_combined, y_pred, output_dict=True)
+print(f"\nClass 0 - Precision: {report['0']['precision']:.2f}, Recall: {report['0']['recall']:.2f}, F1-score: {report['0']['f1-score']:.2f}")
+print(f"Class 1 - Precision: {report['1']['precision']:.2f}, Recall: {report['1']['recall']:.2f}, F1-score: {report['1']['f1-score']:.2f}")
+
+# Confusion matrix
+cm = confusion_matrix(y_combined, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.show()
+
+# ROC and AUC
+fpr, tpr, _ = roc_curve(y_combined, y_pred_proba)
+auc = roc_auc_score(y_combined, y_pred_proba)
+
+# Plot ROC curve
+plt.plot(fpr, tpr, color='red', label=f'AUC = {auc:.2f}')
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend()
+plt.show()
+
+
+from sklearn.metrics import classification_report, confusion_matrix
+
+# Classification report with error handling for missing class labels
+report = classification_report(y_combined, y_pred, output_dict=True, labels=[0, 1])
+
+# Print metrics only for the present classes to avoid KeyError
+for cls in [0, 1]:
+    if str(cls) in report:
+        print(f"\nClass {cls} - Precision: {report[str(cls)]['precision']:.2f}, "
+              f"Recall: {report[str(cls)]['recall']:.2f}, "
+              f"F1-score: {report[str(cls)]['f1-score']:.2f}")
+
+# Confusion Matrix
+cm = confusion_matrix(y_combined, y_pred, labels=[0, 1])
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.show()
+
+# ROC and AUC Calculation
+fpr, tpr, _ = roc_curve(y_combined, y_pred_proba)
+auc = roc_auc_score(y_combined, y_pred_proba)
+
+# Plot the ROC curve
+plt.plot(fpr, tpr, color='red', label=f'AUC = {auc:.2f}')
+plt.plot([0, 1], [0, 1], linestyle='--', color='gray')
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('ROC Curve')
+plt.legend()
+plt.show()
