@@ -1,0 +1,297 @@
+!python3 -m pip install transformers
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+import nltk
+
+
+
+import pandas as pd
+import sklearn
+import unicodedata
+import numpy as np
+import random
+import re
+import nltk
+from nltk.corpus import movie_reviews
+from sklearn.model_selection import train_test_split
+import tensorflow as tf
+import tensorflow.keras as keras
+import transformers
+
+#from transformers import BertTokenizer, TFBertForSequenceClassification
+from transformers import RobertaTokenizer, TFRobertaForSequenceClassification
+import tensorflow as tf
+
+from tensorflow.keras import mixed_precision
+mixed_precision.set_global_policy('mixed_float16')
+
+#To load our dataset
+import pandas as pd
+df= pd.read_csv('/content/drive/MyDrive/Colab Notebooks/CT22_english_1C_harmful_train.csv')
+df.head(5)
+
+len(df)
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+df_train= pd.read_csv('/content/drive/MyDrive/Colab Notebooks/CT22_english_1C_harmful_train.csv')
+
+df_test= pd.read_csv('/content/drive/MyDrive/Colab Notebooks/CT22_english_1C_harmful_dev_test.csv')
+
+
+df_test
+
+X_train_text =df_train["tweet_text"].values
+y_train =df_train["class_label"].values
+
+X_test_text =df_test["tweet_text"].values
+
+
+
+
+
+
+y_train =np.array(y_train)
+y_test=np.array(y_test)
+
+num_classes = 2
+
+
+tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+
+#     combine step for tokenization,
+#     WordPiece vector mapping,
+#     adding special tokens as well as
+#     truncating reviews longer than the max length
+
+def convert_example_to_feature(review):
+    return tokenizer.encode_plus(
+        review,
+        add_special_tokens = True,     # add [CLS], [SEP]
+        max_length = 256,              # max length of the text that can go to BERT
+        padding='max_length',
+        truncation=True,
+        return_attention_mask = True,  # add attention mask to not focus on pad tokens
+    )
+
+# map to the expected input to TFBertForSequenceClassification
+def map_example_to_dict(input_ids, attention_masks, label):
+    return {
+      "input_ids": input_ids,
+      #"token_type_ids": token_type_ids,
+      "attention_mask": attention_masks,
+    }, label
+
+def encode_examples(ds):
+    # prepare list, so that we can build up final TensorFlow dataset from slices.
+    input_ids_list = []
+    #token_type_ids_list = []
+    attention_mask_list = []
+    label_list = []
+    for review, label in ds:
+        bert_input = convert_example_to_feature(review)
+        input_ids_list.append(bert_input['input_ids'])
+        #token_type_ids_list.append(bert_input['token_type_ids'])
+        attention_mask_list.append(bert_input['attention_mask'])
+        label_list.append([label])
+
+    return tf.data.Dataset.from_tensor_slices((input_ids_list, attention_mask_list, label_list)).map(map_example_to_dict)
+
+
+
+batch_size =32
+
+# train dataset
+ds_train = zip(X_train_text, y_train)
+ds_test = zip(X_test_text, y_test)
+ds_train_encoded = encode_examples(ds_train).shuffle(len(X_train_text)).batch(batch_size)
+ds_test_encoded = encode_examples(ds_test).batch(batch_size)
+
+!mkdir model
+
+#log_dir ='/content/model/' #'./sentiment-analysis-using-bert-keras/tensorboard_data/tb_bert'
+#model_save_path ='/content/model/bert_model.h5' #'./sentiment-analysis-using-bert-keras/models/bert_model.h5'
+
+log_dir ='/content/drive/MyDrive/Colab Notebooks/RoBertModel/' #'./sentiment-analysis-using-bert-keras/tensorboard_data/tb_bert'
+model_save_path ='/content/drive/MyDrive/Colab Notebooks/RoBertModel/bert_model.h5' #'./sentiment-analysis-using-bert-keras/models/bert_model.h5'
+
+#path = '/content/model/'#"./sentiment-analysis-using-bert-keras/models/"
+
+# recommended learning rate for Adam 5e-5, 3e-5, 2e-5
+learning_rate = 3e-5
+# multiple epochs might be better as long as we will not overfit the model
+number_of_epochs = 12
+
+## Initialize pre-built BERT-based classifier from transformers
+#bert_model = TFBertForSequenceClassification.from_pretrained('bert-base-uncased', num_labels=num_classes)
+bert_model = TFRobertaForSequenceClassification.from_pretrained("roberta-base",num_labels=num_classes)
+
+bert_model.summary()
+
+# choosing Adam optimizer
+optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, epsilon=1e-08)
+# we do not have one-hot vectors, we can use sparce categorical cross entropy and accuracy
+loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+metric = tf.keras.metrics.SparseCategoricalAccuracy('accuracy')
+
+bert_model.compile(loss=loss, optimizer=optimizer, metrics=metric)
+
+history = bert_model.fit(ds_train_encoded,
+                         batch_size=batch_size,
+                         epochs=number_of_epochs,
+                         #validation_data=ds_test_encoded
+                         )
+
+bert_model.evaluate(ds_test_encoded,
+                    batch_size=batch_size)
+
+y_test_pred = bert_model.predict(ds_test_encoded,
+                                 batch_size=batch_size)
+
+y_test_pred_class = y_test_pred[0].argmax(axis=1)
+
+print(y_test_pred_class[:10])
+print(y_test[:10])
+
+def plot_confusion_matrix(cm,
+                          target_names,
+                          title='Confusion matrix',
+                          cmap=None,
+                          normalize=True):
+    """
+    given a sklearn confusion matrix (cm), make a nice plot
+
+    Arguments
+    ---------
+    cm:           confusion matrix from sklearn.metrics.confusion_matrix
+
+    target_names: given classification classes such as [0, 1, 2]
+                  the class names, for example: ['high', 'medium', 'low']
+
+    title:        the text to display at the top of the matrix
+
+    cmap:         the gradient of the values displayed from matplotlib.pyplot.cm
+                  see http://matplotlib.org/examples/color/colormaps_reference.html
+                  plt.get_cmap('jet') or plt.cm.Blues
+
+    normalize:    If False, plot the raw numbers
+                  If True, plot the proportions
+
+    Usage
+    -----
+    plot_confusion_matrix(cm           = cm,                  # confusion matrix created by
+                                                              # sklearn.metrics.confusion_matrix
+                          normalize    = True,                # show proportions
+                          target_names = y_labels_vals,       # list of names of the classes
+                          title        = best_estimator_name) # title of graph
+
+    Citiation
+    ---------
+    http://scikit-learn.org/stable/auto_examples/model_selection/plot_confusion_matrix.html
+
+    """
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import itertools
+
+    accuracy = np.trace(cm) / float(np.sum(cm))
+    misclass = 1 - accuracy
+
+    if cmap is None:
+        cmap = plt.get_cmap('Blues')
+
+    plt.figure(figsize=(8, 6), dpi=150)
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+
+    if target_names is not None:
+        tick_marks = np.arange(len(target_names))
+        plt.xticks(tick_marks, target_names, rotation=45)
+        plt.yticks(tick_marks, target_names)
+
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+    thresh = cm.max() / 1.5 if normalize else cm.max() / 2
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        if normalize:
+            plt.text(j,
+                     i,
+                     "{:0.4f}".format(cm[i, j]),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+        else:
+            plt.text(j,
+                     i,
+                     "{:,}".format(cm[i, j]),
+                     horizontalalignment="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(
+        accuracy, misclass))
+    plt.show()
+
+cm = sklearn.metrics.confusion_matrix(y_test,
+                                      y_test_pred_class,
+                                      normalize=None)
+
+#printing classification report
+from sklearn.metrics import classification_report
+print(classification_report(y_test,y_test_pred_class))
+
+
+
+#!rm -rf "/content/robertmodel"
+
+ pip install transformers
+
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+results = confusion_matrix(y_test,y_test_pred_class)
+
+sns.heatmap(results/np.sum(results), annot=True, fmt='.2%', cmap="YlGnBu",xticklabels=["Not-Harmful", "Harmful"], yticklabels=["Not-Harmful", "Harmful"])
+
+print('Confusion Matrix:')
+
+
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+results = confusion_matrix(y_test, y_test_pred_class)
+
+# Define a custom color palette
+colors = ["blue", "red"]
+
+# Create a colormap from the custom color palette
+cmap = sns.color_palette(colors)
+
+# Plot the heatmap using the custom colormap
+sns.heatmap(results/np.sum(results), annot=True, fmt='.2%', cmap=cmap, xticklabels=["Harmful", "Not Harmful"], yticklabels=["Harmful", "Not Harmful"])
+
+# Add colorbar legend
+plt.colorbar()
+
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+
+plt.show()
